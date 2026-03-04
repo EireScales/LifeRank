@@ -3,19 +3,9 @@ import { NextResponse } from "next/server";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-type LifeRankProfile = {
-  score: number;
-  career: number;
-  money: number;
-  health: number;
-  social: number;
-  growth: number;
-  weakestCategories?: string[];
-};
-
 export async function POST(request: Request) {
   try {
-    const { question, profile } = (await request.json()) as { question?: string; profile?: LifeRankProfile };
+    const { question, profile } = (await request.json()) as { question?: string; profile?: unknown };
 
     if (!question) {
       return NextResponse.json({ error: "Please include a question." }, { status: 400 });
@@ -25,38 +15,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "OPENAI_API_KEY is not configured." }, { status: 500 });
     }
 
-    const context = profile
-      ? [
-          "User LifeRank Profile:",
-          `Score: ${profile.score}`,
-          `Career score: ${profile.career}`,
-          `Money score: ${profile.money}`,
-          `Health score: ${profile.health}`,
-          `Social score: ${profile.social}`,
-          `Growth score: ${profile.growth}`,
-          `Weakest categories: ${(profile.weakestCategories ?? []).join(", ") || "Not available"}`
-        ].join("\n")
-      : "User LifeRank Profile: Not available";
-
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
         {
           role: "system",
           content:
-            "You are LifeRank AI, a supportive self-improvement coach. Give practical, encouraging, and specific weekly actions. Focus advice on weakest categories first. Keep responses concise (under 180 words) and include an immediate next step for today."
+            "You are LifeRank AI. Give concise, practical, empathetic coaching with concrete weekly actions based on user profile scores."
         },
         {
           role: "user",
-          content: `${context}\n\nQuestion: ${question}`
+          content: `Profile: ${JSON.stringify(profile)}\n\nQuestion: ${question}`
         }
       ],
       temperature: 0.7,
-      max_tokens: 320
+      max_tokens: 280
     });
 
     return NextResponse.json({ reply: completion.choices[0]?.message?.content ?? "No response generated." });
-  } catch {
+  } catch (error) {
     return NextResponse.json({ error: "LifeRank AI is currently unavailable." }, { status: 500 });
   }
 }
